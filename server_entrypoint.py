@@ -1,52 +1,16 @@
 from __future__ import annotations
 import hashlib,json,os
-from fastapi import Header,HTTPException,Request
+from fastapi import Header,HTTPException,Request,Query
 from fastapi.responses import HTMLResponse
 import app as core
 from service_identity import authenticate_service,configured_services,fingerprint
+from service_registry import profiles,live_status
 
 app=core.app
 
 
 def require_key(key:str):
     core.auth(key)
-
-
-async def _bind_verified_service(request:Request,sid:str):
-    """Inject the authenticated submitter into the signed/hashed event payload before storage."""
-    raw=await request.body()
-    if not raw:return
-    try:
-        data=json.loads(raw.decode('utf-8'))
-    except Exception:
-        return
-    path=request.url.path
-    if path=='/events' and isinstance(data,dict):
-        payload=data.get('payload') if isinstance(data.get('payload'),dict) else {}
-        payload['_drs_verified_service_id']=sid
-        data['payload']=payload
-    elif path=='/events/batch' and isinstance(data,dict) and isinstance(data.get('events'),list):
-        for event in data['events']:
-            if not isinstance(event,dict):continue
-            payload=event.get('payload') if isinstance(event.get('payload'),dict) else {}
-            payload['_drs_verified_service_id']=sid
-            event['payload']=payload
-    elif path=='/audit/events' and isinstance(data,dict):
-        details=data.get('details') if isinstance(data.get('details'),dict) else {}
-        details['_drs_verified_service_id']=sid
-        data['details']=details
-    new_body=json.dumps(data,separators=(',',':'),ensure_ascii=False).encode('utf-8')
-    request._body=new_body
-    sent=False
-    async def receive():
-        nonlocal sent
-        if sent:return {'type':'http.request','body':b'','more_body':False}
-        sent=True
-        return {'type':'http.request','body':new_body,'more_body':False}
-    request._receive=receive
-    headers=[(k,v) for (k,v) in request.scope['headers'] if k.lower()!=b'content-length']
-    headers.append((b'content-length',str(len(new_body)).encode()))
-    request.scope['headers']=headers
 
 
 @app.middleware('http')
@@ -58,7 +22,6 @@ async def service_identity_middleware(request:Request,call_next):
         skey=request.headers.get('x-service-key','')
         if sid or skey:
             sid=authenticate_service(sid,skey)
-            await _bind_verified_service(request,sid)
             request.scope['headers']=[
                 (k,v) for (k,v) in request.scope['headers']
                 if k.lower()!=b'x-api-key'
@@ -110,6 +73,18 @@ def integrity_verify(x_api_key:str=Header(default='')):
 def services(x_api_key:str=Header(default='')):
     require_key(x_api_key)
     return {'services':[{'service_id':sid,'key_fingerprint':fingerprint(sid)} for sid in configured_services()]}
+
+
+@app.get('/service-registry')
+def service_registry(x_api_key:str=Header(default='')):
+    require_key(x_api_key)
+    return {'services':profiles()}
+
+
+@app.get('/service-status')
+def service_status(stale_after_seconds:int=Query(300,ge=30,le=86400),x_api_key:str=Header(default='')):
+    require_key(x_api_key)
+    return {'services':live_status(stale_after_seconds)}
 
 
 @app.get('/dashboard-ui',response_class=HTMLResponse)
