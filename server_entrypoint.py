@@ -1,14 +1,40 @@
 from __future__ import annotations
 import hashlib,json,os
-from fastapi import Header,HTTPException
+from fastapi import Header,HTTPException,Request
 from fastapi.responses import HTMLResponse
 import app as core
+from service_identity import authenticate_service,configured_services,fingerprint
 
 app=core.app
 
 
 def require_key(key:str):
     core.auth(key)
+
+
+@app.middleware('http')
+async def service_identity_middleware(request:Request,call_next):
+    path=request.url.path
+    ingest_path=path in {'/events','/events/batch','/audit/events'} and request.method.upper()=='POST'
+    if ingest_path:
+        sid=request.headers.get('x-service-id','')
+        skey=request.headers.get('x-service-key','')
+        # Backward-compatible administrative ingestion still works with x-api-key.
+        # Normal collectors should use x-service-id + x-service-key so every event
+        # is attributable to a specific monitored service.
+        if sid or skey:
+            sid=authenticate_service(sid,skey)
+            request.scope['headers']=[
+                (k,v) for (k,v) in request.scope['headers']
+                if k.lower()!=b'x-api-key'
+            ]+[(b'x-api-key',core.API_KEY.encode())]
+            request.state.drs_service_id=sid
+        else:
+            core.auth(request.headers.get('x-api-key',''))
+    response=await call_next(request)
+    if ingest_path and getattr(request.state,'drs_service_id',None):
+        response.headers['X-DRS-Service']=request.state.drs_service_id
+    return response
 
 
 def verify_table(table:str,payload_builder):
@@ -43,6 +69,12 @@ def integrity_verify(x_api_key:str=Header(default='')):
     e=verify_table('events',event_payload)
     a=verify_table('audit',audit_payload)
     return {'ok':bool(e['ok'] and a['ok']),'events':e,'audit':a}
+
+
+@app.get('/services')
+def services(x_api_key:str=Header(default='')):
+    require_key(x_api_key)
+    return {'services':[{'service_id':sid,'key_fingerprint':fingerprint(sid)} for sid in configured_services()]}
 
 
 @app.get('/dashboard-ui',response_class=HTMLResponse)
