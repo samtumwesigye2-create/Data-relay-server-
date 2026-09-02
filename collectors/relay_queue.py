@@ -4,7 +4,9 @@ import httpx
 
 QUEUE_DB=os.environ.get('DRS_QUEUE_DB','drs_queue.db')
 DRS_URL=os.environ.get('DRS_URL','').rstrip('/')
-DRS_API_KEY=os.environ.get('DRS_API_KEY','')
+DRS_SERVICE_ID=os.environ.get('DRS_SERVICE_ID','').strip().lower()
+DRS_SERVICE_KEY=os.environ.get('DRS_SERVICE_KEY','')
+DRS_API_KEY=os.environ.get('DRS_API_KEY','')  # admin/backward-compatible fallback only
 MAX_BATCH=int(os.environ.get('DRS_QUEUE_BATCH','100'))
 
 
@@ -18,13 +20,21 @@ def enqueue(event:dict):
     c=conn(); c.execute('INSERT INTO queue(payload,created_at,attempts) VALUES(?,?,0)',(json.dumps(event,separators=(",",":"),ensure_ascii=False),time.time())); c.commit(); c.close()
 
 
+def _headers():
+    if DRS_SERVICE_ID and DRS_SERVICE_KEY:
+        return {'x-service-id':DRS_SERVICE_ID,'x-service-key':DRS_SERVICE_KEY}
+    if DRS_API_KEY:
+        return {'x-api-key':DRS_API_KEY}
+    return {}
+
+
 def flush_once():
-    if not DRS_URL or not DRS_API_KEY: return 0
+    if not DRS_URL or not _headers(): return 0
     c=conn(); rows=c.execute('SELECT id,payload FROM queue ORDER BY id LIMIT ?',(MAX_BATCH,)).fetchall()
     if not rows: c.close(); return 0
     events=[json.loads(r[1]) for r in rows]
     try:
-        r=httpx.post(DRS_URL+'/events/batch',headers={'x-api-key':DRS_API_KEY},json={'events':events},timeout=8)
+        r=httpx.post(DRS_URL+'/events/batch',headers=_headers(),json={'events':events},timeout=8)
         if r.status_code<300:
             ids=[r[0] for r in rows]; c.executemany('DELETE FROM queue WHERE id=?',[(x,) for x in ids]); c.commit(); n=len(ids); c.close(); return n
     except Exception:
