@@ -12,6 +12,43 @@ def require_key(key:str):
     core.auth(key)
 
 
+async def _bind_verified_service(request:Request,sid:str):
+    """Inject the authenticated submitter into the signed/hashed event payload before storage."""
+    raw=await request.body()
+    if not raw:return
+    try:
+        data=json.loads(raw.decode('utf-8'))
+    except Exception:
+        return
+    path=request.url.path
+    if path=='/events' and isinstance(data,dict):
+        payload=data.get('payload') if isinstance(data.get('payload'),dict) else {}
+        payload['_drs_verified_service_id']=sid
+        data['payload']=payload
+    elif path=='/events/batch' and isinstance(data,dict) and isinstance(data.get('events'),list):
+        for event in data['events']:
+            if not isinstance(event,dict):continue
+            payload=event.get('payload') if isinstance(event.get('payload'),dict) else {}
+            payload['_drs_verified_service_id']=sid
+            event['payload']=payload
+    elif path=='/audit/events' and isinstance(data,dict):
+        details=data.get('details') if isinstance(data.get('details'),dict) else {}
+        details['_drs_verified_service_id']=sid
+        data['details']=details
+    new_body=json.dumps(data,separators=(',',':'),ensure_ascii=False).encode('utf-8')
+    request._body=new_body
+    sent=False
+    async def receive():
+        nonlocal sent
+        if sent:return {'type':'http.request','body':b'','more_body':False}
+        sent=True
+        return {'type':'http.request','body':new_body,'more_body':False}
+    request._receive=receive
+    headers=[(k,v) for (k,v) in request.scope['headers'] if k.lower()!=b'content-length']
+    headers.append((b'content-length',str(len(new_body)).encode()))
+    request.scope['headers']=headers
+
+
 @app.middleware('http')
 async def service_identity_middleware(request:Request,call_next):
     path=request.url.path
@@ -19,11 +56,9 @@ async def service_identity_middleware(request:Request,call_next):
     if ingest_path:
         sid=request.headers.get('x-service-id','')
         skey=request.headers.get('x-service-key','')
-        # Backward-compatible administrative ingestion still works with x-api-key.
-        # Normal collectors should use x-service-id + x-service-key so every event
-        # is attributable to a specific monitored service.
         if sid or skey:
             sid=authenticate_service(sid,skey)
+            await _bind_verified_service(request,sid)
             request.scope['headers']=[
                 (k,v) for (k,v) in request.scope['headers']
                 if k.lower()!=b'x-api-key'
