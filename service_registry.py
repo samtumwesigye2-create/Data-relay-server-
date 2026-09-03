@@ -25,6 +25,12 @@ SERVICE_PROFILES:Dict[str,dict]={
         'role':'Receiving, inventory and dispatch operations',
         'criticality':'critical',
     },
+    'backup':{
+        'display_name':'Backup',
+        'service_type':'backup_recovery',
+        'role':'Backup health, availability and recovery telemetry',
+        'criticality':'critical',
+    },
 }
 
 
