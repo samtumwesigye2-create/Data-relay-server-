@@ -29,6 +29,7 @@ TARGETS={
 def poll_service(service_id:str,env_name:str,display_name:str):
     base=os.getenv(env_name,'').rstrip('/')
     if not base:
+        print(f'[PULSAR-MONITOR] {service_id} NOT_CONFIGURED', flush=True)
         return False
     started=time.perf_counter()
     with urllib.request.urlopen(base+'/health',timeout=5) as r:
@@ -52,6 +53,7 @@ def poll_service(service_id:str,env_name:str,display_name:str):
         c.commit()
     finally:
         c.close()
+    print(f'[PULSAR-MONITOR] {service_id} ONLINE {latency}ms', flush=True)
     return True
 
 
@@ -60,8 +62,9 @@ def poll_all():
     for service_id,(env_name,display_name) in TARGETS.items():
         try:
             results[service_id]=poll_service(service_id,env_name,display_name)
-        except Exception:
+        except Exception as exc:
             results[service_id]=False
+            print(f'[PULSAR-MONITOR] {service_id} FAILED {type(exc).__name__}: {exc}', flush=True)
     return results
 
 
