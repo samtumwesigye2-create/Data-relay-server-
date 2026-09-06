@@ -4,9 +4,13 @@ from typing import Dict,List
 import app as core
 from service_identity import configured_services,fingerprint
 
-# Core services currently monitored by the independent Data Relay Server.
-# Credentials remain in DRS_SERVICE_KEYS; this file contains no secrets.
 SERVICE_PROFILES:Dict[str,dict]={
+    'atlas':{
+        'display_name':'UNG-ATLAS',
+        'service_type':'control_infrastructure',
+        'role':'Enterprise control infrastructure and system orchestration',
+        'criticality':'critical',
+    },
     'ugamap':{
         'display_name':'UGAMAP',
         'service_type':'mapping_navigation',
@@ -38,8 +42,9 @@ def profiles()->List[dict]:
     configured=set(configured_services())
     out=[]
     for sid,p in SERVICE_PROFILES.items():
-        out.append({'service_id':sid,**p,'credential_configured':sid in configured,'key_fingerprint':fingerprint(sid) if sid in configured else ''})
-    # Preserve visibility for any future configured service not yet named above.
+        api_key_mode=(sid=='atlas' and bool(core.API_KEY))
+        credential_configured=sid in configured or api_key_mode
+        out.append({'service_id':sid,**p,'credential_configured':credential_configured,'key_fingerprint':fingerprint(sid) if sid in configured else ('api-key' if api_key_mode else '')})
     for sid in sorted(configured-set(SERVICE_PROFILES)):
         out.append({'service_id':sid,'display_name':sid.upper(),'service_type':'future_service','role':'Registered future service','criticality':'standard','credential_configured':True,'key_fingerprint':fingerprint(sid)})
     return out
