@@ -2,9 +2,17 @@ from __future__ import annotations
 import json, os, threading, time, urllib.request
 import app as core
 
+TARGETS={
+    'atlas':('ATLAS_BASE_URL','UNG-ATLAS'),
+    'core':('CORE_BASE_URL','UNG-CORE'),
+    'iam':('IAM_BASE_URL','UNG-IAM'),
+    'mdm':('MDM_BASE_URL','UNG-MDM'),
+    'noc':('NOC_BASE_URL','UNG-NOC'),
+}
 
-def poll_atlas():
-    base=os.getenv('ATLAS_BASE_URL','').rstrip('/')
+
+def poll_service(service_id:str,env_name:str,display_name:str):
+    base=os.getenv(env_name,'').rstrip('/')
     if not base:
         return False
     started=time.perf_counter()
@@ -13,15 +21,15 @@ def poll_atlas():
     latency=round((time.perf_counter()-started)*1000,2)
     event=core.EventIn(
         category='system_metric',
-        source='atlas',
+        source=service_id,
         severity='info',
         actor='UNG-PULSAR',
         action='health_poll',
-        resource='UNG-ATLAS',
+        resource=display_name,
         status='online',
         duration_ms=latency,
         trace_id='',
-        payload={'service':'UNG-ATLAS','health':data,'verified_service_id':'atlas'}
+        payload={'service':display_name,'health':data,'verified_service_id':service_id}
     )
     c=core.conn()
     try:
@@ -32,14 +40,21 @@ def poll_atlas():
     return True
 
 
+def poll_all():
+    results={}
+    for service_id,(env_name,display_name) in TARGETS.items():
+        try:
+            results[service_id]=poll_service(service_id,env_name,display_name)
+        except Exception:
+            results[service_id]=False
+    return results
+
+
 def _loop():
     while True:
-        try:
-            poll_atlas()
-        except Exception:
-            pass
+        poll_all()
         time.sleep(60)
 
 
 def start():
-    threading.Thread(target=_loop,name='atlas-monitor',daemon=True).start()
+    threading.Thread(target=_loop,name='ung-service-monitor',daemon=True).start()
