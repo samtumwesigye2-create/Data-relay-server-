@@ -63,6 +63,28 @@ def service_registry(x_api_key:str=Header(default='')):
 @app.get('/service-status')
 def service_status(stale_after_seconds:int=Query(300,ge=30,le=86400),x_api_key:str=Header(default='')):
     require_key(x_api_key); return {'services':live_status(stale_after_seconds)}
+@app.get('/status-summary')
+def status_summary(stale_after_seconds:int=Query(300,ge=30,le=86400)):
+    services=live_status(stale_after_seconds)
+    return {
+        'ok':True,
+        'summary':{
+            'total':len(services),
+            'online':sum(1 for s in services if s.get('state')=='online'),
+            'stale':sum(1 for s in services if s.get('state')=='stale'),
+            'waiting':sum(1 for s in services if s.get('state')=='waiting_for_telemetry'),
+            'not_configured':sum(1 for s in services if s.get('state')=='not_configured'),
+        },
+        'services':[{
+            'service_id':s.get('service_id'),
+            'display_name':s.get('display_name'),
+            'state':s.get('state'),
+            'age_seconds':s.get('age_seconds'),
+            'last_category':s.get('last_category'),
+            'last_severity':s.get('last_severity'),
+            'last_result':s.get('last_result'),
+        } for s in services]
+    }
 @app.get('/dashboard-ui',response_class=HTMLResponse)
 def dashboard_ui():
     path=os.path.join(os.path.dirname(__file__),'dashboard.html')
