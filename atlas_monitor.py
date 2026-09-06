@@ -8,6 +8,21 @@ TARGETS={
     'iam':('IAM_BASE_URL','UNG-IAM'),
     'mdm':('MDM_BASE_URL','UNG-MDM'),
     'noc':('NOC_BASE_URL','UNG-NOC'),
+    'titan':('TITAN_BASE_URL','UNG-TITAN'),
+    'midas':('MIDAS_BASE_URL','UNG-MIDAS'),
+    'nova':('NOVA_BASE_URL','UNG-NOVA'),
+    'hermes':('HERMES_BASE_URL','UNG-HERMES'),
+    'nemsis':('NEMSIS_BASE_URL','UNG-NEMSIS'),
+    'horus':('HORUS_BASE_URL','UNG-HORUS'),
+    'sentinel':('SENTINEL_BASE_URL','UNG-SENTINEL'),
+    'vector':('VECTOR_BASE_URL','UNG-VECTOR'),
+    'aegis':('AEGIS_BASE_URL','UNG-AEGIS'),
+    'nexus':('NEXUS_BASE_URL','UNG-NEXUS'),
+    'apollo':('APOLLO_BASE_URL','UNG-APOLLO'),
+    'orion':('ORION_BASE_URL','UNG-ORION'),
+    'docs':('DOCS_BASE_URL','UNG-DOCS'),
+    'procure':('PROCURE_BASE_URL','UNG-PROCURE'),
+    'infra25':('INFRA25_BASE_URL','UNG-INFRA-25'),
 }
 
 
