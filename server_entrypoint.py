@@ -1,7 +1,7 @@
 from __future__ import annotations
 import hashlib,json,os
 from fastapi import Header,HTTPException,Request,Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse,RedirectResponse
 import app as core
 from service_identity import authenticate_service,configured_services,fingerprint
 from service_registry import profiles,live_status
@@ -11,6 +11,11 @@ app=core.app
 
 def require_key(key:str):
     core.auth(key)
+
+
+@app.get('/',include_in_schema=False)
+def root():
+    return RedirectResponse(url='/dashboard-ui',status_code=307)
 
 
 @app.middleware('http')
