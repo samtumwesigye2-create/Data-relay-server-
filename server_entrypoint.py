@@ -90,3 +90,6 @@ def dashboard_ui():
     path=os.path.join(os.path.dirname(__file__),'dashboard.html')
     if not os.path.exists(path): raise HTTPException(404,'dashboard.html missing')
     with open(path,'r',encoding='utf-8') as f: return HTMLResponse(f.read(),headers={'Cache-Control':'no-store'})
+
+from nexus_gateway import router as nexus_router
+app.include_router(nexus_router)
