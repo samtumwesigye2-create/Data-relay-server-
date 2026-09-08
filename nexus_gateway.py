@@ -38,22 +38,15 @@ def janus_auth(authorization: str | None):
 @router.post('/inbound',status_code=202)
 def nexus_inbound(body:NexusEnvelopeIn,authorization:str|None=Header(None)):
     principal=janus_auth(authorization)
-    delivery=Delivery(
-        source=body.source_system,
-        targets=[body.target_system],
-        event_type=body.message_type,
-        payload={
-            'message_id':body.message_id,
-            'correlation_id':body.correlation_id,
-            'trace_id':body.trace_id,
-            'schema_version':body.schema_version,
-            'classification':body.classification,
-            'principal_id':str(principal.get('id') or ''),
-            'body':core.scrub(body.payload),
-        },
-        message_id=body.message_id,
-        idempotency_key=body.message_id,
-        priority=body.priority,
-    )
+    delivery=Delivery(source=body.source_system,targets=[body.target_system],event_type=body.message_type,payload={'message_id':body.message_id,'correlation_id':body.correlation_id,'trace_id':body.trace_id,'schema_version':body.schema_version,'classification':body.classification,'principal_id':str(principal.get('id') or ''),'body':core.scrub(body.payload)},message_id=body.message_id,idempotency_key=body.message_id,priority=body.priority)
     created=core.delivery_planner.enqueue(delivery)
     return {'accepted':True,'duplicate':not created,'message_id':body.message_id,'status':'queued' if created else 'duplicate','target':body.target_system}
+
+@router.get('/status/{message_id}')
+def nexus_status(message_id:str,authorization:str|None=Header(None)):
+    janus_auth(authorization)
+    for row in core.delivery_store.list_queue(limit=1000):
+        if row.get('message_id')==message_id:return {'found':True,'store':'queue','delivery':row}
+    for row in core.delivery_store.list_dlq(limit=1000):
+        if row.get('message_id')==message_id:return {'found':True,'store':'dlq','delivery':row}
+    raise HTTPException(404,'message_not_found')
