@@ -20,6 +20,7 @@ SERVICE_PROFILES:Dict[str,dict]={
     'vector':{'display_name':'UNG-VECTOR','service_type':'warehouse_logistics','role':'Warehouse and logistics operations','criticality':'critical','env':'VECTOR_BASE_URL'},
     'aegis':{'display_name':'UNG-AEGIS','service_type':'protection_security','role':'Protection and security platform','criticality':'critical','env':'AEGIS_BASE_URL'},
     'nexus':{'display_name':'UNG-NEXUS','service_type':'integration','role':'Integration and interoperability services','criticality':'critical','env':'NEXUS_BASE_URL'},
+    'govbridge':{'display_name':'UNG-GOVBRIDGE','service_type':'government_interoperability','role':'Secure bridge between UNG and approved Uganda government systems','criticality':'critical','env':'GOVBRIDGE_BASE_URL'},
     'apollo':{'display_name':'UNG-APOLLO','service_type':'planning_intelligence','role':'Planning and intelligence services','criticality':'critical','env':'APOLLO_BASE_URL'},
     'orion':{'display_name':'UNG-ORION','service_type':'national_operations','role':'National operations command','criticality':'critical','env':'ORION_BASE_URL'},
     'docs':{'display_name':'UNG-DOCS','service_type':'document_management','role':'Document and records services','criticality':'standard','env':'DOCS_BASE_URL'},
