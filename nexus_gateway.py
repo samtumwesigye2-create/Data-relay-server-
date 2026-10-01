@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, urllib.error, urllib.request
+import json, os, urllib.error, urllib.request, hmac
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 import app as core
@@ -7,6 +7,7 @@ from durable_delivery import Delivery
 
 router = APIRouter(prefix='/v1/nexus', tags=['NEXUS Relay'])
 JANUS_BASE_URL = os.getenv('IAM_BASE_URL', os.getenv('JANUS_BASE_URL','https://ung-iam-production.up.railway.app')).rstrip('/')
+NEXUS_INTERNAL_SERVICE_TOKEN = os.getenv('NEXUS_INTERNAL_SERVICE_TOKEN','').strip()
 
 class NexusEnvelopeIn(BaseModel):
     message_id: str = Field(min_length=2,max_length=160)
@@ -23,6 +24,9 @@ class NexusEnvelopeIn(BaseModel):
 def janus_auth(authorization: str | None):
     if not authorization or not authorization.lower().startswith('bearer '):
         raise HTTPException(401,'JANUS bearer token required')
+    token = authorization.split(' ',1)[1].strip()
+    if NEXUS_INTERNAL_SERVICE_TOKEN and hmac.compare_digest(token, NEXUS_INTERNAL_SERVICE_TOKEN):
+        return {'id':'UNG-NEXUS','permissions':['platform:service','nexus.messages.write'],'auth_source':'nexus-internal-service-token'}
     req=urllib.request.Request(JANUS_BASE_URL+'/v1/auth/introspect',data=b'',method='POST',headers={'Authorization':authorization,'User-Agent':'UNG-PULSAR/1.2.0'})
     try:
         with urllib.request.urlopen(req,timeout=5) as r:data=json.loads(r.read().decode() or '{}')
