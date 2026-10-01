@@ -2,10 +2,12 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from uuid import uuid4
 import app as pulsar
+from machine_mind_delivery import start as start_machine_mind_delivery
 from nexus_gateway import router as nexus_router
 
 app = pulsar.app
 app.include_router(nexus_router)
+start_machine_mind_delivery()
 
 class NexusAcceptance(BaseModel):
     message_id: str
