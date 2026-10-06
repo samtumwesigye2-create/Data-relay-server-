@@ -6,9 +6,11 @@ import app as core
 from service_identity import authenticate_service,configured_services,fingerprint
 from service_registry import profiles,live_status
 from atlas_monitor import start as start_atlas_monitor
+from machine_mind_delivery import start as start_machine_mind_delivery
 
 app=core.app
 start_atlas_monitor()
+start_machine_mind_delivery()
 
 
 def require_key(key:str):
