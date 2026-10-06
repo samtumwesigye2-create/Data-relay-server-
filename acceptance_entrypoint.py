@@ -1,18 +1,33 @@
+import os
+
 from fastapi import HTTPException
 from pydantic import BaseModel
 from uuid import uuid4
 import app as pulsar
 from machine_mind_delivery import start as start_machine_mind_delivery
 from nexus_gateway import router as nexus_router
+from production_acceptance import enqueue_machine_mind_acceptance
 
 app = pulsar.app
 app.include_router(nexus_router)
 start_machine_mind_delivery()
 
+_acceptance_enabled = os.getenv('PULSAR_MACHINE_MIND_ACCEPTANCE_ONCE', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+_acceptance_id = os.getenv('PULSAR_MACHINE_MIND_ACCEPTANCE_ID', '').strip()
+_acceptance_created = enqueue_machine_mind_acceptance(
+    pulsar.delivery_planner,
+    enabled=_acceptance_enabled,
+    acceptance_id=_acceptance_id,
+)
+if _acceptance_created:
+    print(f'PULSAR_ACCEPTANCE target=MACHINE-MIND acceptance_id={_acceptance_id} status=queued', flush=True)
+
+
 class NexusAcceptance(BaseModel):
     message_id: str
     source_system: str = 'UNG-NEXUS'
     target_system: str = 'UNG-PULSAR'
+
 
 @app.post('/v1/nexus/acceptance', status_code=202)
 def nexus_acceptance(p: NexusAcceptance):
@@ -24,6 +39,7 @@ def nexus_acceptance(p: NexusAcceptance):
     d.idempotency_key = key
     created = pulsar.delivery_planner.enqueue(d)
     return {'accepted': True, 'duplicate': not created, 'message_id': p.message_id, 'queue_message_id': d.message_id if created else None, 'idempotency_key': key}
+
 
 @app.get('/v1/nexus/acceptance/{message_id}')
 def nexus_acceptance_status(message_id: str):
